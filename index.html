@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gestionale Pizzeria</title>
+<style>
+:root{--btn-w:25mm;--btn-h:12mm;--gap:2px;}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f2f2f2;}
+.container{display:grid;grid-template-columns:0.25fr 2.5fr 0.7fr;height:100vh;gap:8px;padding:8px;}
+.categorie-colonna{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #ccc;border-radius:10px;padding:8px;align-items:stretch;justify-content:flex-start;}
+.categorie-colonna button{padding:8px;border-radius:6px;border:1px solid #bbb;background:#e6e6e6;cursor:pointer;font-size:12px;text-align:center;}
+.categorie-colonna button:hover{background:#dcdcdc;}
+.categorie-colonna button.active{background:#a0d468;border-color:#7ab34f;color:#fff;}
+.sinistra{display:grid;grid-template-rows:1fr 1fr;gap:8px;}
+.prodotti,.aggiunte,.ordine{background:#fff;border:1px solid #ccc;border-radius:10px;padding:8px;display:flex;flex-direction:column;}
+.prodotti,.aggiunte{overflow-y:auto;scrollbar-width:thin;}
+h2{text-align:center;margin:0 0 10px 0;font-size:18px;font-weight:600;}
+.griglia-prodotti,.griglia-aggiunte{display:grid;grid-template-columns:repeat(8,1fr);gap:var(--gap);justify-items:center;align-items:center;}
+.griglia-prodotti button{width:var(--btn-w);height:var(--btn-h);background:#e6e6e6;border:1px solid #bbb;border-radius:8px;font-size:10px;cursor:pointer;transition:0.12s;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.griglia-prodotti button:hover{background:#dcdcdc;transform:scale(1.03);}
+.aggiunta-btn{width:var(--btn-w);height:var(--btn-h);background:#f0f0f0;border:1px solid #bbb;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 4px;font-size:10px;cursor:default;user-select:none;}
+.aggiunta-btn:hover{background:#e8e8e8;transform:scale(1.02);}
+.segno{width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:bold;cursor:pointer;user-select:none;}
+.nome{flex:1;text-align:center;padding:0 4px;font-size:10px;user-select:none;cursor:pointer;}
+.ordine{display:flex;flex-direction:column;justify-content:flex-start;}
+.lista-ordine{flex:1;overflow-y:auto;padding-right:4px;}
+.ordine-item{padding:4px;border-bottom:1px solid #eee;display:flex;flex-direction:column;gap:4px;background:transparent;cursor:pointer;}
+.ordine-item.active{background:#eef9e6;border-left:4px solid #7ab34f;}
+.ordine-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.qty-controls{display:flex;align-items:center;gap:6px;}
+.qty-btn{width:22px;height:22px;border-radius:4px;border:1px solid #bbb;background:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;}
+.qty{min-width:20px;text-align:center;font-weight:600;}
+.aggiunta-lista{font-size:12px;color:#444;margin-left:6px;}
+.aggiunta-lista .pos{color:#2b7a2b;}
+.aggiunta-lista .neg{color:#c0392b;}
+.conferma{margin-top:8px;padding:12px;font-size:16px;cursor:pointer;background:#4CAF50;color:#fff;border:none;border-radius:6px;}
+.input-field{margin-bottom:8px;padding:6px;width:100%;font-size:15px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;}
+@media (max-width:900px){.griglia-prodotti,.griglia-aggiunte{grid-template-columns:repeat(6,1fr);} }
+@media (max-width:700px){.container{grid-template-columns:1fr;grid-template-rows:auto auto 1fr;height:auto;}.categorie-colonna{flex-direction:row;flex-wrap:wrap;justify-content:center;}.sinistra{grid-template-rows:auto auto;}}
+/* modal */
+.modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;}
+.modal .box{background:#fff; border-radius:10px; padding:20px; max-width:800px; width:95%; max-height:90%; overflow:auto;}
+.modal .actions{display:flex; justify-content:flex-end; gap:10px; margin-top:10px;}
+.small-input{padding:6px;margin-right:6px;border:1px solid #ccc;border-radius:6px;}
+</style>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+
+<script>
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js");
+    }
+</script>
+
+</head>
+<body>
+<div class="container">
+
+  <div class="categorie-colonna" id="categorieColonna">
+    <!-- default buttons (rendering may be replaced by saved categories on load) -->
+    <button data-cat="Antipasti">Antipasti</button>
+    <button data-cat="Primi">Primi</button>
+    <button data-cat="Secondi">Secondi</button>
+    <button data-cat="Contorni">Contorni</button>
+    <button data-cat="Pizza" class="active">Pizza</button>
+    <button data-cat="Bevande">Bevande</button>
+    <button data-cat="Dessert">Dessert</button>
+
+    <button id="storicoBtn" style="background:#2196F3;color:#fff;margin-top:auto;margin-bottom:1px;">Storico Ordini</button>
+
+
+    <button id="menuBtn" style="margin-top:auto;background:#4CAF50;color:#fff;">Aggiorna Menu</button>
+
+  </div>
+
+  <div class="sinistra">
+    <div class="prodotti">
+      <h2>Prodotti</h2>
+      <div class="griglia-prodotti" id="prodottiGrid"></div>
+    </div>
+
+    <div class="aggiunte">
+      <h2>Aggiunte</h2>
+      <div class="griglia-aggiunte" id="aggiunteGrid"></div>
+    </div>
+  </div>
+
+  <div class="ordine">
+    <h2>Ordine</h2>
+    <input id="clienteInput" class="input-field" placeholder="Nome Cliente">
+    <input id="ritiroInput" class="input-field" placeholder="Orario Ritiro es: 19:45">
+    <div class="lista-ordine" id="listaOrdine"></div>
+    <div class="totale-ordine" id="totaleOrdine" style="margin-top:8px; font-weight:600; text-align:right;">Totale: €0.00</div>
+    <button class="conferma" id="confermaBtn">Conferma Ordine</button>
+  </div>
+
+</div>
+
+<!-- Preview modal -->
+<div id="previewModal" class="modal">
+  <div class="box">
+    <h2>Anteprima Ordine</h2>
+    <div id="previewContent" style="margin-bottom:12px;"></div>
+    <div class="actions">
+      <button id="saveBtn" style="padding:8px 12px;background:#4CAF50;color:#fff;border:none;border-radius:6px;cursor:pointer;">Salva</button>
+      <button id="closePreviewBtn" style="padding:8px 12px;background:#ccc;border:none;border-radius:6px;cursor:pointer;">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu modal (visuale) -->
+<div id="menuModal" class="modal">
+  <div class="box">
+    <h2>Aggiorna Menu</h2>
+
+    <section style="margin-bottom:12px;">
+      <h3>Categorie</h3>
+      <div id="categorieVisual" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+      <input id="nuovaCategoriaInput" class="small-input" placeholder="Nuova categoria">
+      <button id="aggiungiCategoriaBtn">Aggiungi categoria</button>
+    </section>
+
+    <section style="margin-bottom:12px;">
+      <h3>Prodotti</h3>
+      <div id="prodottiVisual" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;max-height:160px;overflow:auto;"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <input id="nomeProdottoInput" class="small-input" placeholder="Nome prodotto">
+        <input id="categoriaProdottoInput" class="small-input" placeholder="Categoria">
+        <input id="prezzoProdottoInput" class="small-input" placeholder="Prezzo" type="number" step="0.01" />
+        <button id="aggiungiProdottoBtn">Aggiungi prodotto</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Aggiunte</h3>
+      <div id="aggiunteVisual" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;max-height:160px;overflow:auto;"></div>
+      <div style="display:flex;gap:6px;">
+        <input id="nomeAggiuntaInput" class="small-input" placeholder="Nome aggiunta">
+        <input id="prezzoAggiuntaInput" class="small-input" placeholder="Prezzo" type="number" step="0.01" />
+        <button id="aggiungiAggiuntaBtn">Aggiungi aggiunta</button>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="closeMenuBtn" style="padding:8px 12px;background:#ccc;border:none;border-radius:6px;cursor:pointer;">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------
+// Iniziali: prodotti + aggiunte (default)
+// ---------------------------
+let prodotti = [
+  {nome:"Margherita", categoria:"Pizza", prezzo:5},
+  {nome:"Diavola", categoria:"Pizza", prezzo:6},
+  {nome:"Capricciosa", categoria:"Pizza", prezzo:6.5},
+  {nome:"4 Formaggi", categoria:"Pizza", prezzo:7},
+  {nome:"Bufalina", categoria:"Pizza", prezzo:7.5},
+  {nome:"Bruschette", categoria:"Antipasti", prezzo:4},
+  {nome:"Tagliere Misto", categoria:"Antipasti", prezzo:7},
+  {nome:"Spaghetti Carbonara", categoria:"Primi", prezzo:8},
+  {nome:"Lasagna", categoria:"Primi", prezzo:8.5},
+  {nome:"Bistecca", categoria:"Secondi", prezzo:12},
+  {nome:"Cotoletta", categoria:"Secondi", prezzo:10},
+  {nome:"Patatine", categoria:"Contorni", prezzo:3},
+  {nome:"Insalata", categoria:"Contorni", prezzo:3},
+  {nome:"Acqua", categoria:"Bevande", prezzo:1.5},
+  {nome:"Birra", categoria:"Bevande", prezzo:3},
+  {nome:"Tiramisù", categoria:"Dessert", prezzo:4},
+  {nome:"Panna Cotta", categoria:"Dessert", prezzo:4}
+];
+
+let aggiunte = [
+  {nome:"Mozzarella", prezzo:0.5},
+  {nome:"Pomodoro", prezzo:0.3},
+  {nome:"Funghi", prezzo:0.5},
+  {nome:"Prosciutto", prezzo:0.7},
+  {nome:"Olive", prezzo:0.4}
+];
+
+// ---------------------------
+// Caricamento persistente (localStorage)
+// ---------------------------
+
+const savedProdotti = JSON.parse(localStorage.getItem('prodotti') || 'null');
+if(savedProdotti) prodotti = savedProdotti;
+
+const savedAggiunte = JSON.parse(localStorage.getItem('aggiunte') || 'null');
+if(savedAggiunte) aggiunte = savedAggiunte;
+
+// categories: read existing DOM buttons as default, but overwrite if saved
+const savedCategorie = JSON.parse(localStorage.getItem('categorie') || 'null');
+if(savedCategorie){
+  const col = document.getElementById('categorieColonna');
+  // remove existing data-cat buttons
+  col.querySelectorAll('button[data-cat]').forEach(b=>b.remove());
+  savedCategorie.forEach(cat=>{
+    const b = document.createElement('button');
+    b.dataset.cat = cat;
+    b.textContent = cat;
+    col.insertBefore(b, document.getElementById('menuBtn'));
+  });
+}
+
+// ---------------------------
+// Stato ordine
+// ---------------------------
+let ordine = [];
+let activeItemId = null;
+let uniqueIdCounter = 1;
+window.__originalOrderId = null;
+
+// ---------------------------
+// Utility / render
+// ---------------------------
+function getActiveCategory(){
+  return document.querySelector('.categorie-colonna button.active')?.dataset.cat || null;
+}
+
+function renderCategorieVisualInModal(){
+  const wrap = document.getElementById('categorieVisual');
+  wrap.innerHTML = '';
+  // categories from DOM:
+  const cats = Array.from(document.querySelectorAll('.categorie-colonna button[data-cat]')).map(b=>b.dataset.cat);
+  cats.forEach(c=>{
+    const row = document.createElement('div');
+    row.style.display='flex';
+    row.style.alignItems='center';
+    row.style.gap='8px';
+    row.innerHTML = `<strong>${c}</strong>`;
+    const del = document.createElement('button'); del.textContent='×'; del.style.background='#e74c3c'; del.style.color='#fff'; del.style.border='none'; del.style.borderRadius='6px'; del.style.cursor='pointer';
+    del.addEventListener('click', ()=>{
+      // remove button from DOM
+      document.querySelectorAll('.categorie-colonna button[data-cat]').forEach(b=>{
+        if(b.dataset.cat===c) b.remove();
+      });
+      saveCategorieToStorage();
+      renderProdotti();
+      renderCategorieVisualInModal();
+    });
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+}
+
+function renderProdotti(){
+  const grid = document.getElementById('prodottiGrid');
+  grid.innerHTML = '';
+  const cat = getActiveCategory();
+  const list = cat ? prodotti.filter(p=>p.categoria===cat) : prodotti;
+  list.forEach(p=>{
+    const btn = document.createElement('button');
+    btn.textContent = p.nome;
+    btn.dataset.nome = p.nome;
+    btn.dataset.cat = p.categoria;
+    btn.addEventListener('click', ()=> addProdottoToOrder(p));
+    grid.appendChild(btn);
+  });
+}
+
+function renderAggiunte(){
+  const grid = document.getElementById('aggiunteGrid');
+  grid.innerHTML = '';
+  aggiunte.forEach(a=>{
+    const wrap = document.createElement('div'); wrap.className='aggiunta-btn';
+    wrap.dataset.nome = a.nome;
+    wrap.innerHTML = `<div class="segno meno">−</div><div class="nome">${a.nome}</div><div class="segno piu">+</div>`;
+    // attach handlers to plus/minus elements
+    wrap.querySelector('.piu').addEventListener('click', (ev)=>{ ev.stopPropagation(); addAggiuntaToActive(a.nome, +1); });
+    wrap.querySelector('.meno').addEventListener('click', (ev)=>{ ev.stopPropagation(); addAggiuntaToActive(a.nome, -1); });
+    wrap.querySelector('.nome').addEventListener('click', ()=>{ /* noop: name click */ });
+    grid.appendChild(wrap);
+  });
+}
+
+function addProdottoToOrder(p){
+  const existing = ordine.find(it=>it.nome===p.nome && JSON.stringify(it.aggiunte||{})==='{}');
+  if(existing){ existing.quantita++; activeItemId = existing.id; }
+  else{ ordine.push({ id: uniqueIdCounter++, nome: p.nome, aggiunte: {}, quantita: 1 }); activeItemId = uniqueIdCounter-1; }
+  renderOrder();
+}
+
+function addAggiuntaToActive(nome, delta){
+  if(!activeItemId){ alert('Seleziona prima un prodotto nell\'ordine'); return; }
+  const it = ordine.find(x=>x.id===activeItemId);
+  it.aggiunte[nome] = (it.aggiunte[nome]||0) + delta;
+  if(it.aggiunte[nome] === 0) delete it.aggiunte[nome];
+  renderOrder();
+}
+function renderOrder(){
+  const lista = document.getElementById('listaOrdine');
+  lista.innerHTML = '';
+  let totale = 0;
+
+  ordine.forEach(it => {
+    const row = document.createElement('div');
+    row.className = 'ordine-item';
+    if(it.id === activeItemId) row.classList.add('active');
+
+    // Prezzo base del prodotto
+    const base = (prodotti.find(p => p.nome === it.nome)?.prezzo) || 0;
+
+    // Prezzo aggiunte
+    let extra = 0;
+Object.entries(it.aggiunte || {}).forEach(([nome, qty]) => {
+  const aggiPrezzo = aggiunte.find(a => a.nome === nome)?.prezzo || 0;
+  if (qty > 0) extra += aggiPrezzo * qty; // conteggia solo aggiunte positive
+});
+
+    // Quantità (fallback a 1 se mancante)
+    const qty = it.quantita || 1;
+
+    // Totale dell'item
+    const totItem = (base + extra) * qty;
+    totale += totItem;
+
+    // HTML item
+    const topDiv = document.createElement('div');
+    topDiv.className = 'ordine-top';
+    topDiv.innerHTML = `
+      <div class="qty-controls">
+        <button class="qty-btn">−</button>
+        <div class="qty">${qty}</div>
+        <button class="qty-btn">+</button>
+      </div>
+      <div style="font-weight:600;">${it.nome} - €${totItem.toFixed(2)}</div>
+    `;
+
+    // Gestione aggiunte (se presenti)
+    if(it.aggiunte && Object.keys(it.aggiunte).length){
+      const aggiEl = document.createElement('div');
+      aggiEl.className = 'aggiunta-lista';
+      aggiEl.innerHTML = Object.entries(it.aggiunte).map(([n,q])=>{
+        return q > 0 ? `<span class="pos">+ ${n} x${q}</span>` : `<span class="neg">− ${n} x${Math.abs(q)}</span>`;
+      }).join('<br>');
+      row.appendChild(topDiv);
+      row.appendChild(aggiEl);
+    } else {
+      row.appendChild(topDiv);
+    }
+
+    // Eventi pulsanti quantità
+    const plusBtn = topDiv.querySelector('.qty-btn:nth-child(3)');
+    const minusBtn = topDiv.querySelector('.qty-btn:nth-child(1)');
+    plusBtn.addEventListener('click', ev => { ev.stopPropagation(); it.quantita++; renderOrder(); });
+    minusBtn.addEventListener('click', ev => { 
+      ev.stopPropagation(); 
+      it.quantita--; 
+      if(it.quantita <= 0){
+        ordine = ordine.filter(x => x.id !== it.id);
+        if(activeItemId === it.id) activeItemId = null;
+      }
+      renderOrder(); 
+    });
+
+    // Selezione item
+    row.addEventListener('click', () => { activeItemId = it.id; renderOrder(); });
+
+    lista.appendChild(row);
+  });
+
+  // Aggiorna totale generale
+  document.getElementById('totaleOrdine').textContent = `Totale: €${totale.toFixed(2)}`;
+}
+
+// ---------------------------
+// Modifica ordine (caricamento dal storico)
+// ---------------------------
+let modificaOrdine = JSON.parse(localStorage.getItem('modificaOrdine') || 'null');
+if(modificaOrdine){
+  document.getElementById('clienteInput').value = modificaOrdine.cliente || '';
+  document.getElementById('ritiroInput').value = modificaOrdine.ritiro || '';
+  window.__originalOrderId = modificaOrdine.id;
+  ordine = (modificaOrdine.ordine || []).map(it => ({
+    id: it.id || uniqueIdCounter++,
+    nome: it.nome,
+    aggiunte: it.aggiunte || {},
+    quantita: it.quantita || 1
+  }));
+  // ensure uniqueIdCounter is larger than max id
+  const maxId = ordine.reduce((m,i)=>Math.max(m, i.id || 0), 0);
+  uniqueIdCounter = Math.max(uniqueIdCounter, maxId + 1);
+  localStorage.removeItem('modificaOrdine');
+  renderOrder();
+}
+
+// ---------------------------
+// Preview & save flow
+// ---------------------------
+document.getElementById('confermaBtn').addEventListener('click', ()=>{
+  if(!ordine.length){ alert('Ordine vuoto'); return; }
+  const preview = document.getElementById('previewContent');
+  preview.innerHTML = ordine.map(it=>{
+    const base = prodotti.find(p=>p.nome===it.nome)?.prezzo || 0;
+    let extra = 0;
+    const aggiList = Object.entries(it.aggiunte||{}).map(([n,q])=>{ extra += (aggiunte.find(a=>a.nome===n)?.prezzo||0)*q; return `${q>0?'+':'−'} ${n} x${Math.abs(q)}`; }).join('<br>');
+    const tot = (base + extra) * it.quantita;
+    return `<div style="margin-bottom:8px;"><strong>${it.nome} x${it.quantita} - €${tot.toFixed(2)}</strong><br>${aggiList}</div>`;
+  }).join('');
+  document.getElementById('previewModal').style.display='flex';
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  if (!ordine.length) return;
+
+  const cliente = document.getElementById('clienteInput').value.trim() || '[non specificato]';
+  const ritiro = document.getElementById('ritiroInput').value.trim() || '[non specificato]';
+
+  // Calcolo totale ordine basato su prodotti e aggiunte correnti
+  let totale = 0;
+  ordine.forEach(it => {
+    const base = prodotti.find(p => p.nome === it.nome)?.prezzo || 0;
+    let extra = 0;
+    Object.entries(it.aggiunte || {}).forEach(([nome, qty]) => {
+  const prezzoAggi = aggiunte.find(a => a.nome === nome)?.prezzo || 0;
+  if (qty > 0) extra += prezzoAggi * qty; // solo aggiunte positive
+});
+    totale += (base + extra) * it.quantita;
+  });
+
+  let ordiniPrecedenti = JSON.parse(localStorage.getItem('ordini') || '[]');
+
+  const ordineDaSalvare = {
+    id: window.__originalOrderId ? window.__originalOrderId : Date.now(),
+    data: new Date().toISOString(),
+    cliente,
+    ritiro,
+    ordine: JSON.parse(JSON.stringify(ordine)),
+    totale: totale.toFixed(2) // <-- ora incluso
+  };
+
+  // Aggiorna o aggiunge nuovo ordine
+  if (window.__originalOrderId) {
+    const idx = ordiniPrecedenti.findIndex(x => x.id === window.__originalOrderId);
+    if (idx >= 0) ordiniPrecedenti[idx] = ordineDaSalvare;
+    else ordiniPrecedenti.push(ordineDaSalvare);
+  } else {
+    ordiniPrecedenti.push(ordineDaSalvare);
+  }
+
+  localStorage.setItem('ordini', JSON.stringify(ordiniPrecedenti));
+
+  // reset ordine e ritorno a storico
+  ordine = [];
+  activeItemId = null;
+  window.__originalOrderId = null;
+  renderOrder();
+  document.getElementById('previewModal').style.display = 'none';
+  setTimeout(() => { window.location.href = 'storico.html'; }, 80);
+});
+
+
+// ---------------------------
+// Filtri categorie (click sui pulsanti)
+// ---------------------------
+function wireCategorieButtons(){
+  document.querySelectorAll('.categorie-colonna button[data-cat]').forEach(btn=>{
+    btn.removeEventListener('click', btn._handler); // safe-remove if present
+    const handler = () => {
+      document.querySelectorAll('.categorie-colonna button[data-cat]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderProdotti();
+    };
+    btn._handler = handler;
+    btn.addEventListener('click', handler);
+  });
+}
+
+// ---------------------------
+// Menu modal (visual) - open/close & actions
+// ---------------------------
+const menuModal = document.getElementById('menuModal');
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  menuModal.style.display='flex';
+  renderCategorieVisualInModal();
+  renderProdottiVisualInModal();
+  renderAggiunteVisualInModal();
+});
+
+document.getElementById('closeMenuBtn').addEventListener('click', ()=>{ menuModal.style.display='none'; });
+
+// helpers to save to storage
+function saveProdottiToStorage(){ localStorage.setItem('prodotti', JSON.stringify(prodotti)); }
+function saveAggiunteToStorage(){ localStorage.setItem('aggiunte', JSON.stringify(aggiunte)); }
+function saveCategorieToStorage(){
+  const cats = Array.from(document.querySelectorAll('.categorie-colonna button[data-cat]')).map(b=>b.dataset.cat);
+  localStorage.setItem('categorie', JSON.stringify(cats));
+}
+
+// Visual lists inside modal
+function renderProdottiVisualInModal(){
+  const wrap = document.getElementById('prodottiVisual');
+  wrap.innerHTML = '';
+  prodotti.forEach((p, idx)=>{
+    const r = document.createElement('div'); r.style.display='flex'; r.style.alignItems='center'; r.style.justifyContent='space-between';
+    r.innerHTML = `${p.nome} — ${p.categoria} — €${p.prezzo.toFixed(2)}`;
+    const del = document.createElement('button'); del.textContent='Elimina'; del.style.background='#e74c3c'; del.style.color='#fff'; del.style.border='none'; del.style.borderRadius='6px'; del.style.cursor='pointer';
+    del.addEventListener('click', ()=>{ prodotti.splice(idx,1); saveProdottiToStorage(); renderProdotti(); renderProdottiVisualInModal(); });
+    r.appendChild(del);
+    wrap.appendChild(r);
+  });
+}
+
+function renderAggiunteVisualInModal(){
+  const wrap = document.getElementById('aggiunteVisual');
+  wrap.innerHTML='';
+  aggiunte.forEach((a, idx)=>{
+    const r = document.createElement('div'); r.style.display='flex'; r.style.alignItems='center'; r.style.justifyContent='space-between';
+    r.innerHTML = `${a.nome} — €${a.prezzo.toFixed(2)}`;
+    const del = document.createElement('button'); del.textContent='Elimina'; del.style.background='#e74c3c'; del.style.color='#fff'; del.style.border='none'; del.style.borderRadius='6px'; del.style.cursor='pointer';
+    del.addEventListener('click', ()=>{ aggiunte.splice(idx,1); saveAggiunteToStorage(); renderAggiunte(); renderAggiunteVisualInModal(); });
+    r.appendChild(del);
+    wrap.appendChild(r);
+  });
+}
+
+// add handlers for modal add buttons
+document.getElementById('aggiungiCategoriaBtn').addEventListener('click', ()=>{
+  const val = document.getElementById('nuovaCategoriaInput').value.trim();
+  if(!val){ return; }
+  // create button in sidebar (before menuBtn)
+  const col = document.getElementById('categorieColonna');
+  const btn = document.createElement('button'); btn.dataset.cat = val; btn.textContent = val;
+  col.insertBefore(btn, document.getElementById('menuBtn'));
+  document.getElementById('nuovaCategoriaInput').value = '';
+  wireCategorieButtons();
+  saveCategorieToStorage();
+  renderCategorieVisualInModal();
+  renderProdotti(); // refresh products filter
+});
+
+document.getElementById('aggiungiProdottoBtn').addEventListener('click', ()=>{
+  const nome = document.getElementById('nomeProdottoInput').value.trim();
+  const cat = document.getElementById('categoriaProdottoInput').value.trim();
+  const prezzo = parseFloat(document.getElementById('prezzoProdottoInput').value);
+  if(!nome || !cat || Number.isNaN(prezzo)) return alert('Compila nome, categoria e prezzo validi');
+  prodotti.push({nome, categoria:cat, prezzo});
+  saveProdottiToStorage();
+  document.getElementById('nomeProdottoInput').value=''; document.getElementById('categoriaProdottoInput').value=''; document.getElementById('prezzoProdottoInput').value='';
+  renderProdotti();
+  renderProdottiVisualInModal();
+});
+
+document.getElementById('aggiungiAggiuntaBtn').addEventListener('click', ()=>{
+  const nome = document.getElementById('nomeAggiuntaInput').value.trim();
+  const prezzo = parseFloat(document.getElementById('prezzoAggiuntaInput').value);
+  if(!nome || Number.isNaN(prezzo)) return alert('Compila nome e prezzo validi');
+  aggiunte.push({nome, prezzo});
+  saveAggiunteToStorage();
+  document.getElementById('nomeAggiuntaInput').value=''; document.getElementById('prezzoAggiuntaInput').value='';
+  renderAggiunte();
+  renderAggiunteVisualInModal();
+});
+
+// Visual modal render helpers (categories)
+function renderCategorieVisualInModal(){
+  // uses functions above to show current categories + delete capability is in renderCategorieVisualInModal earlier
+  const wrap = document.getElementById('categorieVisual');
+  wrap.innerHTML = '';
+  const cats = Array.from(document.querySelectorAll('.categorie-colonna button[data-cat]')).map(b=>b.dataset.cat);
+  cats.forEach((c, idx)=>{
+    const r = document.createElement('div'); r.style.display='flex'; r.style.alignItems='center'; r.style.gap='8px';
+    r.innerHTML = `<span>${c}</span>`;
+    const del = document.createElement('button'); del.textContent='Elimina'; del.style.background='#e74c3c'; del.style.color='#fff'; del.style.border='none'; del.style.borderRadius='6px'; del.style.cursor='pointer';
+    del.addEventListener('click', ()=>{
+      // remove from sidebar
+      document.querySelectorAll('.categorie-colonna button[data-cat]').forEach(b=>{ if(b.dataset.cat===c) b.remove(); });
+      saveCategorieToStorage();
+      renderProdotti();
+      renderCategorieVisualInModal();
+    });
+    r.appendChild(del);
+    wrap.appendChild(r);
+  });
+}
+
+// ---------------------------
+// Save/load helpers already used above
+// ---------------------------
+
+// ---------------------------
+// Wire initial buttons and startup render
+// ---------------------------
+wireCategorieButtons();
+renderProdotti();
+renderAggiunte();
+renderCategorieVisualInModal();
+renderProdottiVisualInModal();
+renderAggiunteVisualInModal();
+// ---------------------------
+// Pulsante "Storico Ordini"
+// ---------------------------
+document.getElementById('storicoBtn').addEventListener('click', ()=>{
+  window.location.href = 'storico.html';
+});
+
+</script>
+</body>
+</html>

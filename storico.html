@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Storico Ordini</title>
+<style>
+body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f2f2f2; padding:12px; }
+h1 { text-align:center; margin-bottom:20px; }
+.barra-comandi { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; justify-content:center; }
+.barra-comandi button { background:#2196F3; color:#fff; border:none; border-radius:6px; padding:8px 12px; cursor:pointer; font-weight:600; }
+.barra-comandi button:hover { background:#1976D2; }
+
+#filtro { width:100%; max-width:300px; padding:6px 10px; margin:0 auto 20px auto; display:block; font-size:15px; border-radius:6px; border:1px solid #ccc; }
+
+.card-container { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+
+.ordine-card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 2px 6px rgba(0,0,0,0.1); cursor:pointer; transition:0.15s; border-left:4px solid transparent; }
+.ordine-card:hover { transform:scale(1.02); }
+.ordine-card.evaso { border-left:4px solid #e74c3c; opacity:0.7; }
+
+.ordine-card h3 { margin:0 0 6px 0; font-size:16px; }
+.ordine-card p { margin:2px 0; font-size:14px; }
+
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000; }
+.modal .box { background:#fff; border-radius:10px; padding:20px; max-width:600px; width:95%; max-height:90%; overflow:auto; }
+.modal .box h2 { margin-top:0; }
+.modal .azioni { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+.modal .azioni button { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; font-weight:600; }
+.modifica { background:#f39c12; color:#fff; }
+.elimina { background:#e74c3c; color:#fff; }
+.stampa { background:#4CAF50; color:#fff; }
+
+@media(max-width:600px){ .card-container { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<h1>Storico Ordini</h1>
+
+<div class="barra-comandi">
+  <button id="tornaIndex">⬅️ Nuovo ordine</button>
+  <button id="cancellaTutti">🗑️ Elimina Tutti</button>
+</div>
+
+<input type="text" id="filtro" placeholder="Cerca ordine per cliente o orario...">
+
+<div class="card-container" id="cardContainer"></div>
+
+<!-- Modal Anteprima -->
+<div id="previewModal" class="modal">
+  <div class="box">
+    <h2>Anteprima Ordine</h2>
+    <div id="previewContent" style="margin-bottom:12px;"></div>
+    <div class="azioni">
+      <button class="stampa" id="stampaBtn">Stampa</button>
+      <button class="modifica" id="modificaBtn">Modifica</button>
+      <button class="elimina" id="eliminaBtn">Elimina</button>
+      <button id="chiudiModal" style="background:#ccc;">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Caricamento ordini
+let ordini = JSON.parse(localStorage.getItem('ordini') || '[]');
+let selectedOrdineId = null;
+
+const cardContainer = document.getElementById('cardContainer');
+const previewModal = document.getElementById('previewModal');
+const previewContent = document.getElementById('previewContent');
+
+// Funzione per renderizzare le card
+function renderCard() {
+  cardContainer.innerHTML = '';
+  ordini.forEach(ord => {
+    const card = document.createElement('div');
+    card.className = 'ordine-card' + (ord.evaso ? ' evaso' : '');
+    card.dataset.id = ord.id;
+    card.innerHTML = `<h3>${ord.cliente}</h3>
+                      <p>Orario: ${ord.ritiro}</p>
+                      <p>Totale: €${ord.totale || '0.00'}</p>`;
+    card.addEventListener('click', ()=>openPreview(ord.id));
+    cardContainer.appendChild(card);
+  });
+}
+
+// Funzione apri modal
+function openPreview(id){
+  selectedOrdineId = id;
+  const ord = ordini.find(o=>o.id===id);
+  const contenuto = ord.ordine.map(it=>{
+    const aggiList = Object.entries(it.aggiunte||{}).map(([n,q])=>`${q>0?'+':'−'} ${n} x${Math.abs(q)}`).join('<br>');
+    return `<div style="margin-bottom:6px;"><strong>${it.nome} x${it.quantita}</strong><br>${aggiList}</div>`;
+  }).join('');
+  previewContent.innerHTML = `<p><strong>Cliente:</strong> ${ord.cliente}</p>
+                              <p><strong>Ritiro:</strong> ${ord.ritiro}</p>
+                              <p><strong>Totale:</strong> €${ord.totale || '0.00'}</p>
+                              <hr>
+                              ${contenuto}`;
+  previewModal.style.display='flex';
+}
+
+// Chiudi modal
+document.getElementById('chiudiModal').addEventListener('click', ()=>{ previewModal.style.display='none'; });
+
+// Stampa
+document.getElementById('stampaBtn').addEventListener('click', ()=>{
+  const ord = ordini.find(o=>o.id===selectedOrdineId);
+  const win = window.open('', '_blank');
+  win.document.write('<pre>'+previewContent.innerHTML+'</pre>');
+  win.print();
+  win.close();
+  // contrassegna evaso
+  ord.evaso = true;
+  localStorage.setItem('ordini', JSON.stringify(ordini));
+  renderCard();
+  previewModal.style.display='none';
+});
+
+// Elimina
+document.getElementById('eliminaBtn').addEventListener('click', ()=>{
+  if(!confirm('Eliminare definitivamente questo ordine?')) return;
+  ordini = ordini.filter(o=>o.id!==selectedOrdineId);
+  localStorage.setItem('ordini', JSON.stringify(ordini));
+  renderCard();
+  previewModal.style.display='none';
+});
+
+// Modifica
+document.getElementById('modificaBtn').addEventListener('click', ()=>{
+  const ord = ordini.find(o=>o.id===selectedOrdineId);
+  localStorage.setItem('modificaOrdine', JSON.stringify(ord));
+  window.location.href = 'index.html';
+});
+
+// Filtra card
+document.getElementById('filtro').addEventListener('input', e=>{
+  const testo = e.target.value.toLowerCase();
+  document.querySelectorAll('.ordine-card').forEach(card=>{
+    const ord = ordini.find(o=>o.id==card.dataset.id);
+    card.style.display = (ord.cliente.toLowerCase().includes(testo) || ord.ritiro.toLowerCase().includes(testo)) ? '' : 'none';
+  });
+});
+
+// Torna al menu
+document.getElementById('tornaIndex').addEventListener('click', ()=> window.location.href='index.html');
+
+// Cancella tutti
+document.getElementById('cancellaTutti').addEventListener('click', ()=>{
+  if(!confirm('Eliminare tutti gli ordini?')) return;
+  ordini = [];
+  localStorage.setItem('ordini', JSON.stringify(ordini));
+  renderCard();
+});
+
+// inizializza
+renderCard();
+</script>
+
+</body>
+</html>

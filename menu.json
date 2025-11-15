@@ -1,0 +1,18 @@
+{
+  "categorie": ["Antipasti","Primi","Secondi","Contorni","Pizza","Bevande","Dessert"],
+  "prodotti": [
+    {"nome": "Margherita", "categoria": "Pizza", "prezzo": 5},
+    {"nome": "Diavola", "categoria": "Pizza", "prezzo": 6},
+    {"nome": "Capricciosa", "categoria": "Pizza", "prezzo": 6.5},
+    {"nome": "Bruschette", "categoria": "Antipasti", "prezzo": 4},
+    {"nome": "Spaghetti Carbonara", "categoria": "Primi", "prezzo": 8},
+    {"nome": "Lasagna", "categoria": "Primi", "prezzo": 8.5}
+  ],
+  "aggiunte": [
+    {"nome": "Mozzarella", "prezzo": 0.5},
+    {"nome": "Pomodoro", "prezzo": 0.3},
+    {"nome": "Funghi", "prezzo": 0.5},
+    {"nome": "Prosciutto", "prezzo": 0.7},
+    {"nome": "Olive", "prezzo": 0.4}
+  ]
+}
